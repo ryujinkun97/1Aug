@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
+<title>Every Chapter, Us</title>
+<meta name="description" content="A love story written in scrolls, stars, and starlight — for Akansha." />
+
+<!-- ============================================================
+     FONTS — a serif for the narration voice, a soft sans for the
+     interface, a handwritten script for anything that should feel
+     like ink on paper (letters, the time capsule, signatures).
+     ============================================================ -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Marcellus&family=Poppins:wght@300;400;500;600&family=Parisienne&display=swap" rel="stylesheet">
+
+<!-- ============================================================
+     LIBRARIES (CDN — no build step needed)
+     ============================================================ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+
+<style>
+/* ================================================================
+   DESIGN TOKENS
+   Palette:
+     --void      #05020c   near-black, the page's resting state
+     --plum      #1c0b2e   dark purple, section grounds
+     --plum-2    #2c1147   lighter plum, gradients / cards
+     --rose      #ff6f9c   rose pink, primary accent + warmth
+     --rose-deep #c73866   deeper rose, shadows on the accent
+     --gold      #f3c977   gold, the "precious" accent — used sparingly
+     --paper     #fbf3e7   warm white, for letters & readable body copy
+     --ink       #2a1830   near-black plum for text on paper
+   Type:
+     display -> 'Cormorant Garamond' (narration, section titles)
+     utility -> 'Marcellus' (labels, eyebrows, numbers)
+     body    -> 'Poppins' (UI copy, buttons)
+     hand    -> 'Parisienne' (signatures, letters, the final line)
+   Signature element: a hand-drawn constellation line that threads
+   through the whole site — as a loading motif, a section divider,
+   and finally the literal scene where two names are drawn in stars.
+================================================================= */
+:root{
+  --void:#05020c;
+  --plum:#1c0b2e;
+  --plum-2:#2c1147;
+  --rose:#ff6f9c;
+  --rose-deep:#c73866;
+  --gold:#f3c977;
+  --paper:#fbf3e7;
+  --ink:#2a1830;
+  --ease-soft: cubic-bezier(.22,.9,.28,1);
+}
+
+*{ margin:0; padding:0; box-sizing:border-box; }
+html{ scroll-behavior:smooth; background:var(--void); }
+body{
+  background:var(--void);
+  color:var(--paper);
+  font-family:'Poppins', sans-serif;
+  overflow-x:hidden;
+  cursor:none;
+}
+body.touch-device{ cursor:auto; }
+
+::selection{ background:var(--rose); color:var(--void); }
+
+h1,h2,h3, .display{ font-family:'Cormorant Garamond', serif; font-weight:500; }
+.eyebrow{ font-family:'Marcellus', serif; letter-spacing:.35em; text-transform:uppercase; font-size:.7rem; color:var(--gold); }
+.hand{ font-family:'Parisienne', cursive; }
+
+a{ color:inherit; }
+button{ font-family:inherit; border:none; background:none; color:inherit; cursor:pointer; }
+
+/* ---------------- background layers (fixed, behind everything) --------------- */
+#bg-canvas{
+  position:fixed; inset:0; width:100%; height:100%;
+  z-index:0; pointer-events:none;
+}
+.bg-gradient{
+  position:fixed; inset:0; z-index:0;
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(199,56,102,.18), transparent 60%),
+    radial-gradient(ellipse 80% 60% at 50% 100%, rgba(44,17,71,.55), transparent 70%),
+    linear-gradient(180deg, var(--void), var(--plum) 45%, var(--void));
+  pointer-events:none;
+}
+
+/* ---------------- custom cursor ---------------- */
+#cursor-glow{
+  position:fixed; top:0; left:0; width:26px; height:26px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,111,156,.9), rgba(255,111,156,0) 70%);
+  pointer-events:none; z-index:9999; transform:translate(-50%,-50%);
+  transition:opacity .3s;
+  mix-blend-mode:screen;
+}
+#cursor-ring{
+  position:fixed; top:0; left:0; width:34px; height:34px; border-radius:50%;
+  border:1px solid rgba(243,201,119,.6);
+  pointer-events:none; z-index:9999; transform:translate(-50%,-50%);
+}
+
+/* ---------------- loading screen ---------------- */
+#loader{
+  position:fixed; inset:0; z-index:10000; background:var(--void);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.4rem;
+  transition:opacity 1s var(--ease-soft), visibility 1s;
+}
+#loader.hide{ opacity:0; visibility:hidden; pointer-events:none; }
+#loader-constellation{ width:120px; height:60px; }
+#loader-pct{ font-family:'Marcellus', serif; letter-spacing:.3em; font-size:.85rem; color:var(--rose); }
+#loader-label{ font-family:'Cormorant Garamond', serif; font-style:italic; color:rgba(251,243,231,.6); font-size:1rem; }
+
+/* ---------------- generic section scaffolding ---------------- */
+section{
+  position:relative; z-index:1;
+  min-height:100vh;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:6rem 6vw;
+}
+.section-inner{ width:100%; max-width:1100px; margin:0 auto; text-align:center; }
+.reveal{ opacity:0; transform:translateY(40px); }
+
+.section-title{ font-size:clamp(2.2rem, 6vw, 4rem); margin-bottom:.6rem; }
+.section-sub{ color:rgba(251,243,231,.65); font-size:1.05rem; max-width:560px; margin:0 auto 3rem; font-weight:300; }
+
+.glass{
+  background:rgba(28,11,46,.35);
+  border:1px solid rgba(255,255,255,.08);
+  backdrop-filter:blur(18px) saturate(140%);
+  -webkit-backdrop-filter:blur(18px) saturate(140%);
+  border-radius:20px;
+}
+
+.glow-btn{
+  position:relative; padding:1rem 2.6rem; border-radius:100px;
+  background:linear-gradient(135deg, var(--rose), var(--rose-deep));
+  color:var(--paper); font-weight:500; letter-spacing:.04em;
+  box-shadow:0 0 30px rgba(255,111,156,.45), 0 0 70px rgba(255,111,156,.15);
+  transition:transform .4s var(--ease-soft), box-shadow .4s;
+}
+.glow-btn:hover{ transform:translateY(-3px) scale(1.03); box-shadow:0 0 45px rgba(255,111,156,.65), 0 0 110px rgba(255,111,156,.25); }
+.glow-btn:active{ transform:translateY(0) scale(.98); }
+.glow-btn.gold{ background:linear-gradient(135deg, var(--gold), #c98f3f); color:var(--ink); box-shadow:0 0 30px rgba(243,201,119,.4); }
+
+/* ================= OPENING ================= */
+#intro{ flex-direction:column; text-align:center; overflow:hidden; }
+#intro-canvas{ position:absolute; inset:0; z-index:0; }
+#intro-content{ position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; gap:2rem; }
+#typewriter{
+  font-size:clamp(1.6rem, 5vw, 2.8rem); min-height:9rem; max-width:800px;
+  line-height:1.4; font-style:italic;
+}
+#typewriter .cursor-bar{ display:inline-block; width:2px; background:var(--gold); animation:blink 1s infinite; margin-left:2px; }
+@keyframes blink{ 50%{ opacity:0; } }
+#begin-btn{ opacity:0; }
+
+/* ================= COUNTER ================= */
+.counter-grid{ display:flex; gap:1.4rem; justify-content:center; flex-wrap:wrap; margin-top:1rem; }
+.counter-cell{ width:110px; padding:1.4rem .5rem; }
+.counter-num{ font-size:2.6rem; font-family:'Marcellus',serif; color:var(--rose); }
+.counter-label{ font-size:.7rem; letter-spacing:.2em; text-transform:uppercase; color:rgba(251,243,231,.6); margin-top:.3rem; }
+
+/* ================= GALLERY ================= */
+.gallery-track{ display:flex; gap:2.4rem; overflow-x:auto; padding:3rem 4vw; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; }
+.gallery-track::-webkit-scrollbar{ height:6px; }
+.gallery-track::-webkit-scrollbar-thumb{ background:var(--rose-deep); border-radius:10px; }
+.polaroid{
+  flex:0 0 auto; width:240px; scroll-snap-align:center;
+  background:var(--paper); border-radius:6px; padding:14px 14px 50px;
+  box-shadow:0 20px 50px rgba(0,0,0,.5);
+  transform-style:preserve-3d; transition:transform .5s var(--ease-soft);
+  cursor:pointer; position:relative;
+}
+.polaroid-img{
+  width:100%; height:260px; border-radius:2px; object-fit:cover;
+  background:linear-gradient(135deg,var(--plum-2),var(--rose-deep));
+  display:flex; align-items:center; justify-content:center;
+  color:rgba(255,255,255,.5); font-family:'Marcellus',serif; font-size:.75rem; text-align:center; padding:1rem;
+}
+.polaroid-cap{ position:absolute; bottom:12px; left:14px; right:14px; color:var(--ink); font-family:'Parisienne',cursive; font-size:1.15rem; text-align:center; }
+.polaroid.zoomed{ position:fixed; inset:0; margin:auto; width:min(90vw,420px); height:fit-content; z-index:500; transform:none !important; }
+#gallery-overlay{ position:fixed; inset:0; background:rgba(5,2,12,.85); z-index:400; opacity:0; pointer-events:none; transition:opacity .4s; }
+#gallery-overlay.show{ opacity:1; pointer-events:auto; }
+
+/* ================= TIMELINE ================= */
+.timeline{ position:relative; max-width:640px; margin:0 auto; padding-top:1rem; }
+.timeline::before{ content:''; position:absolute; left:24px; top:0; bottom:0; width:1px; background:linear-gradient(var(--rose), var(--gold), var(--rose)); opacity:.4; }
+.tl-item{ position:relative; padding:1.6rem 0 1.6rem 66px; text-align:left; }
+.tl-dot{
+  position:absolute; left:8px; top:1.9rem; width:34px; height:34px; border-radius:50%;
+  background:var(--plum-2); border:1px solid rgba(255,255,255,.15);
+  display:flex; align-items:center; justify-content:center; font-size:1.1rem;
+  box-shadow:0 0 0 0 rgba(255,111,156,.5); transition:box-shadow .6s;
+}
+.tl-item.unlocked .tl-dot{ box-shadow:0 0 24px 4px rgba(255,111,156,.55); background:var(--rose-deep); }
+.tl-card{
+  padding:1.2rem 1.4rem; opacity:.45; transform:translateX(-14px);
+  transition:opacity .6s var(--ease-soft), transform .6s var(--ease-soft);
+}
+.tl-item.unlocked .tl-card{ opacity:1; transform:translateX(0); }
+.tl-title{ font-size:1.3rem; margin-bottom:.3rem; }
+.tl-text{ font-size:.9rem; color:rgba(251,243,231,.7); font-weight:300; }
+
+/* ================= REASONS ================= */
+#reason-stage{
+  min-height:220px; display:flex; align-items:center; justify-content:center; padding:2rem; margin-bottom:2rem;
+  font-family:'Cormorant Garamond',serif; font-style:italic; font-size:clamp(1.3rem,3.4vw,1.9rem);
+}
+#reason-count{ font-size:.8rem; letter-spacing:.15em; color:rgba(251,243,231,.5); margin-top:1rem; }
+
+/* ================= LETTERS ================= */
+.letters-field{ position:relative; height:60vh; max-width:900px; margin:0 auto; }
+.letter{
+  position:absolute; width:64px; height:44px; cursor:pointer;
+  background:linear-gradient(135deg,#fbf3e7,#e9dcc4); border-radius:3px 3px 8px 8px;
+  box-shadow:0 10px 24px rgba(0,0,0,.4);
+}
+.letter::before{ content:'❤'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--rose-deep); font-size:.9rem; }
+#letter-reader{
+  position:fixed; inset:0; z-index:600; display:flex; align-items:center; justify-content:center;
+  background:rgba(5,2,12,.9); opacity:0; pointer-events:none; transition:opacity .5s; padding:2rem;
+}
+#letter-reader.show{ opacity:1; pointer-events:auto; }
+#letter-paper{
+  max-width:520px; width:100%; max-height:80vh; overflow-y:auto; background:var(--paper); color:var(--ink);
+  padding:3rem 2.4rem; border-radius:4px; font-family:'Cormorant Garamond',serif; font-size:1.15rem; line-height:1.8;
+  box-shadow:0 40px 100px rgba(0,0,0,.6); transform:scale(.85); transition:transform .5s var(--ease-soft);
+}
+#letter-reader.show #letter-paper{ transform:scale(1); }
+#letter-close{ position:absolute; top:1.4rem; right:1.8rem; font-size:1.6rem; color:var(--paper); }
+
+/* ================= HIDDEN STARS ================= */
+.hidden-star{
+  position:absolute; width:26px; height:26px; cursor:pointer; z-index:5;
+  background:radial-gradient(circle, #fff, rgba(255,255,255,0) 70%);
+  border-radius:50%; opacity:.7; transition:opacity .3s, transform .3s;
+  animation:star-pulse 2.2s ease-in-out infinite;
+}
+.hidden-star:hover{ opacity:1; transform:scale(1.6); }
+.hidden-star.found{ opacity:0; pointer-events:none; animation:none; }
+@keyframes star-pulse{ 0%,100%{ opacity:.5; transform:scale(.85); } 50%{ opacity:1; transform:scale(1.15); } }
+
+/* ================= QUIZ ================= */
+.quiz-card{ max-width:520px; margin:0 auto; padding:2.4rem; }
+.quiz-q{ font-size:1.3rem; margin-bottom:1.4rem; }
+.quiz-options{ display:flex; gap:1rem; justify-content:center; flex-wrap:wrap; }
+.quiz-opt{
+  padding:.8rem 1.6rem; border-radius:100px; border:1px solid rgba(255,255,255,.2);
+  transition:.3s; font-size:.95rem;
+}
+.quiz-opt:hover{ border-color:var(--rose); background:rgba(255,111,156,.12); }
+.quiz-opt.picked{ background:var(--rose-deep); border-color:var(--rose-deep); }
+
+/* ================= FUTURE DREAMS ================= */
+.dream-road{ display:flex; flex-direction:column; gap:2.4rem; max-width:520px; margin:0 auto; }
+.dream-item{
+  display:flex; align-items:center; gap:1.4rem; padding:1.2rem 1.6rem; text-align:left;
+  border-left:2px solid rgba(255,255,255,.1); position:relative;
+}
+.dream-icon{
+  width:52px; height:52px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-size:1.4rem; background:var(--plum-2); flex:0 0 auto; box-shadow:0 0 0 rgba(243,201,119,0); transition:box-shadow 1s;
+}
+.dream-item.glow .dream-icon{ box-shadow:0 0 26px 4px rgba(243,201,119,.5); }
+.dream-title{ font-size:1.15rem; }
+.dream-text{ font-size:.85rem; color:rgba(251,243,231,.6); font-weight:300; }
+
+/* ================= CONSTELLATION ================= */
+#constellation-canvas{ width:100%; max-width:700px; height:340px; margin:0 auto; display:block; }
+
+/* ================= MOON ================= */
+#moon-wrap{ position:relative; width:220px; height:220px; margin:0 auto 1.4rem; cursor:pointer; }
+#moon-canvas{ width:100%; height:100%; }
+
+/* ================= LOVE METER ================= */
+.meter-bar{ width:min(80vw,420px); height:14px; border-radius:20px; background:rgba(255,255,255,.08); margin:1.4rem auto; overflow:hidden; }
+.meter-fill{ height:100%; width:99%; background:linear-gradient(90deg,var(--rose),var(--gold)); border-radius:20px; transition:width 1.2s var(--ease-soft); }
+#meter-pct{ font-size:3rem; font-family:'Marcellus',serif; color:var(--gold); }
+
+/* ================= GIFT BOX ================= */
+#gift-box{ width:150px; height:150px; margin:0 auto; position:relative; cursor:pointer; }
+.gift-lid{ position:absolute; top:0; left:-6px; right:-6px; height:44px; background:linear-gradient(135deg,var(--gold),#c98f3f); border-radius:6px; transform-origin:left center; transition:transform .6s var(--ease-soft); z-index:2; }
+.gift-body{ position:absolute; top:44px; left:0; right:0; bottom:0; background:linear-gradient(135deg,var(--rose-deep),var(--rose)); border-radius:4px; }
+.gift-ribbon{ position:absolute; top:0; bottom:0; left:50%; width:20px; margin-left:-10px; background:var(--gold); z-index:3; }
+#gift-box.open .gift-lid{ transform:translateY(-70px) rotate(-25deg); }
+#gift-message{ margin-top:1.6rem; opacity:0; font-family:'Cormorant Garamond',serif; font-style:italic; font-size:1.3rem; }
+
+/* ================= FINAL PROPOSAL ================= */
+#final-scene{ background:var(--void); flex-direction:column; text-align:center; overflow:hidden; }
+#final-canvas{ position:absolute; inset:0; z-index:0; }
+#final-typewriter{ font-size:clamp(1.4rem,4vw,2.2rem); font-style:italic; min-height:6rem; max-width:700px; }
+#proposal-heart{ font-size:5rem; filter:drop-shadow(0 0 30px rgba(255,111,156,.7)); animation:heartbeat 1.6s infinite; }
+@keyframes heartbeat{ 0%,100%{ transform:scale(1); } 15%{ transform:scale(1.15); } 30%{ transform:scale(1); } 45%{ transform:scale(1.1); } }
+#ring-animation{ width:90px; height:90px; border:4px solid var(--gold); border-radius:50%; opacity:0; box-shadow:0 0 40px rgba(243,201,119,.6); }
+#final-question{ font-size:clamp(1.6rem,4.4vw,2.6rem); opacity:0; margin-top:2rem; max-width:640px; }
+
+/* ================= ENDING ================= */
+#ending{ background:radial-gradient(ellipse at 50% 30%, rgba(199,56,102,.25), var(--void) 70%); }
+#ending .section-title{ font-size:clamp(2.6rem,7vw,5rem); }
+#fireworks-canvas{ position:absolute; inset:0; z-index:0; }
+
+/* ================= TIME CAPSULE ================= */
+#time-capsule{
+  position:fixed; inset:0; z-index:9500; background:var(--void); display:flex; align-items:center; justify-content:center;
+  opacity:0; pointer-events:none; transition:opacity 1.4s var(--ease-soft); flex-direction:column; gap:2rem; padding:2rem;
+}
+#time-capsule.show{ opacity:1; pointer-events:auto; }
+#capsule-notice{ font-family:'Marcellus',serif; letter-spacing:.15em; color:var(--gold); font-size:.9rem; opacity:0; }
+#capsule-letter{
+  max-width:520px; background:var(--paper); color:var(--ink); padding:3rem 2.4rem; border-radius:4px;
+  font-family:'Cormorant Garamond',serif; font-size:1.15rem; line-height:1.85; opacity:0; transform:translateY(20px);
+  box-shadow:0 40px 100px rgba(0,0,0,.6); max-height:80vh; overflow-y:auto;
+}
+#capsule-letter .hand{ font-size:1.5rem; }
+
+/* ================= MUSIC PLAYER ================= */
+#music-player{
+  position:fixed; bottom:1.4rem; right:1.4rem; z-index:3000;
+  display:flex; align-items:center; gap:.7rem; padding:.6rem .9rem .6rem .6rem;
+}
+#music-toggle{
+  width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(135deg,var(--rose),var(--rose-deep)); font-size:1.1rem; flex:0 0 auto;
+  box-shadow:0 0 20px rgba(255,111,156,.4);
+}
+.wave-bars{ display:flex; align-items:flex-end; gap:2px; height:16px; }
+.wave-bars span{ width:2.5px; background:var(--gold); border-radius:2px; height:4px; }
+#music-player.playing .wave-bars span{ animation:wave 1s ease-in-out infinite; }
+.wave-bars span:nth-child(1){ animation-delay:0s; } .wave-bars span:nth-child(2){ animation-delay:.15s; }
+.wave-bars span:nth-child(3){ animation-delay:.3s; } .wave-bars span:nth-child(4){ animation-delay:.45s; }
+@keyframes wave{ 0%,100%{ height:4px; } 50%{ height:16px; } }
+
+/* ================= HEART RAIN / RIPPLE ================= */
+.falling-heart{ position:fixed; top:-40px; z-index:8000; pointer-events:none; font-size:1.4rem; }
+.touch-ripple{ position:fixed; width:14px; height:14px; border-radius:50%; border:2px solid var(--rose); pointer-events:none; z-index:8000; transform:translate(-50%,-50%); }
+
+/* ================= MISC ================= */
+.divider-const{ width:70px; height:20px; margin:0 auto 1.6rem; opacity:.6; }
+.tap-hint{ font-size:.75rem; letter-spacing:.15em; color:rgba(251,243,231,.4); text-transform:uppercase; margin-top:1rem; }
+
+@media (max-width: 640px){
+  section{ padding:5rem 6vw; }
+  .counter-cell{ width:80px; padding:1rem .3rem; }
+  .counter-num{ font-size:1.9rem; }
+  .gallery-track{ padding:2rem 4vw; gap:1.4rem; }
+  .polaroid{ width:190px; }
+  .polaroid-img{ height:210px; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     BACKGROUND — one canvas, always alive: stars, drifting hearts,
+     roses, sakura petals, shooting stars, neon particles.
+     ============================================================ -->
+<div class="bg-gradient"></div>
+<canvas id="bg-canvas"></canvas>
+<div id="cursor-glow"></div>
+<div id="cursor-ring"></div>
+
+<!-- ============================================================
+     LOADER
+     ============================================================ -->
+<div id="loader">
+  <svg id="loader-constellation" viewBox="0 0 120 60">
+    <line x1="10" y1="45" x2="35" y2="15" stroke="#ff6f9c" stroke-width="1" opacity=".7"/>
+    <line x1="35" y1="15" x2="60" y2="40" stroke="#ff6f9c" stroke-width="1" opacity=".7"/>
+    <line x1="60" y1="40" x2="85" y2="12" stroke="#f3c977" stroke-width="1" opacity=".7"/>
+    <line x1="85" y1="12" x2="110" y2="38" stroke="#f3c977" stroke-width="1" opacity=".7"/>
+    <circle cx="10" cy="45" r="2.4" fill="#fff"/><circle cx="35" cy="15" r="2.4" fill="#fff"/>
+    <circle cx="60" cy="40" r="2.4" fill="#fff"/><circle cx="85" cy="12" r="2.4" fill="#fff"/><circle cx="110" cy="38" r="2.4" fill="#fff"/>
+  </svg>
+  <div id="loader-pct">0%</div>
+  <div id="loader-label">gathering starlight...</div>
+</div>
+
+<!-- ============================================================
+     OPENING SCENE
+     ============================================================ -->
+<section id="intro">
+  <canvas id="intro-canvas"></canvas>
+  <div id="intro-content">
+    <div id="typewriter"></div>
+    <button id="begin-btn" class="glow-btn">Begin Our Story</button>
+  </div>
+</section>
+
+<!-- ============================================================
+     LOVE COUNTER
+     ============================================================ -->
+<section id="counter-section">
+  <div class="section-inner reveal">
+    <div class="eyebrow">Since the day it started</div>
+    <h2 class="section-title">Every second, still counting</h2>
+    <p class="section-sub">Not because I'm keeping score — because I never want to forget a single one.</p>
+    <div class="counter-grid">
+      <div class="counter-cell glass"><div class="counter-num" id="c-days">0</div><div class="counter-label">Days</div></div>
+      <div class="counter-cell glass"><div class="counter-num" id="c-hours">0</div><div class="counter-label">Hours</div></div>
+      <div class="counter-cell glass"><div class="counter-num" id="c-mins">0</div><div class="counter-label">Minutes</div></div>
+      <div class="counter-cell glass"><div class="counter-num" id="c-secs">0</div><div class="counter-label">Seconds</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     PHOTO GALLERY
+     ============================================================ -->
+<section id="gallery-section">
+  <div class="section-inner reveal">
+    <div class="eyebrow">A few frames</div>
+    <h2 class="section-title">Moments I keep replaying</h2>
+    <p class="section-sub">Tap any photo. Replace these placeholders with your own twenty (or two hundred).</p>
+  </div>
+  <div class="gallery-track reveal" id="gallery-track"></div>
+</section>
+<div id="gallery-overlay"></div>
+
+<!-- ============================================================
+     TIMELINE
+     ============================================================ -->
+<section id="timeline-section">
+  <div class="section-inner reveal">
+    <div class="eyebrow">Chapter by chapter</div>
+    <h2 class="section-title">How we got here</h2>
+    <p class="section-sub">Scroll slowly. Each one unlocks when it's ready to be seen.</p>
+    <div class="timeline" id="timeline-list"></div>
+  </div>
+</section>
+
+<!-- ============================================================
+     REASONS I LOVE YOU
+     ============================================================ -->
+<section id="reasons-section">
+  <div class="section-inner reveal">
+    <div class="eyebrow">One hundred, and counting</div>
+    <h2 class="section-title">Reasons I love you</h2>
+    <p class="section-sub">One reason per tap. Come back tomorrow for another.</p>
+    <div id="reason-stage" class="glass">
+      <span id="reason-text">Tap below to find out reason #1.</span>
+    </div>
+    <button id="reason-btn" class="glow-btn">Give me a reason</button>
+    <div id="reason-count">0 of 100 discovered</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     FLOATING LOVE LETTERS
+     ============================================================ -->
+<section id="letters-section">
+  <div class="section-inner reveal">
+    <div class="eyebrow">Sealed with something real</div>
+    <h2 class="section-title">Floating love letters</h2>
+    <p class="section-sub">Tap one to break the seal.</p>
+  </div>
+  <div class="letters-field reveal" id="letters-field"></div>
+</section>
+<div id="letter-reader">
+  <button id="letter-close">✕</button>
+  <div id="letter-paper"></div>
+</div>
+
+<!-- ============================================================
+     HIDDEN SECRET MESSAGES (lives across the whole page — see JS)
+     ============================================================ -->
+<section id="secrets-section">
+  <div class="section-inner reveal">
+    <div class="eyebrow">Somewhere in the sky</div>
+    <h2 class="section-title">Hidden heartbeats</h2>
+    <p class="section-sub">A few stars scattered across this page aren't just decoration. Find <span id="secret-total">5</span>, and each one whispers something back.</p>
+    <div id="secret-found-count" style="margin-top:1rem; font-family:'Marcellus',serif; letter-spacing:.15em; color:var(--gold);">0 found</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     COUPLE QUIZ
+     ============================================================ -->
+<section id="quiz-section">
+  <div class="section-inner reveal">
+    <div class="eyebrow">Be honest</div>
+    <h2 class="section-title">The couple quiz</h2>
+    <div class="quiz-card glass" id="quiz-card"></div>
+  </div>
+</section>
+
+<!-- ============================================================
+     FUTURE DREAMS
+     ============================================================ -->
+<section id="dreams-section">
+  <div class="section-inner reveal">
+    <div class="eyebrow">Not yet, but someday</div>
+    <h2 class="section-title">Everything I still want with you</h2>
+    <div class="dream-road" id="dream-road"></div>
+  </div>
+</section>
+
+<!-- ============================================================
+     OUR CONSTELLATION
+     ============================================================ -->
+<section id="constellation-section">
+  <div class="section-inner reveal">
+    <div class="eyebrow">Written in the stars, literally</div>
+    <h2 class="section-title">Our constellation</h2>
+    <canvas id="constellation-canvas"></canvas>
+  </div>
+</section>
+
+<!-- ============================================================
+     INTERACTIVE MOON
+     ============================================================ -->
+<section id="moon-section">
+  <div class="section-inner reveal">
+    <div class="eyebrow">Same moon, every night</div>
+    <h2 class="section-title">Touch the moon</h2>
+    <div id="moon-wrap"><canvas id="moon-canvas"></canvas></div>
+    <p class="tap-hint">tap it</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     LOVE METER
+     ============================================================ -->
+<section id="meter-section">
+  <div class="section-inner reveal">
+    <div class="eyebrow">Highly unscientific</div>
+    <h2 class="section-title">The love meter</h2>
+    <div id="meter-pct">99%</div>
+    <div class="meter-bar"><div class="meter-fill" id="meter-fill"></div></div>
+    <p class="section-sub" id="meter-caption">Started at 99%. It's never going down.</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     SURPRISE GIFT BOX
+     ============================================================ -->
+<section id="gift-section">
+  <div class="section-inner reveal">
+    <div class="eyebrow">One more thing</div>
+    <h2 class="section-title">A small gift</h2>
+    <div id="gift-box">
+      <div class="gift-ribbon"></div>
+      <div class="gift-lid"></div>
+      <div class="gift-body"></div>
+    </div>
+    <div id="gift-message">You are the greatest gift I've ever received.</div>
+    <p class="tap-hint">shake, then tap</p>
+  </div>
+</section>
+
+<!-- ============================================================
+     FINAL PROPOSAL SCENE
+     ============================================================ -->
+<section id="final-scene">
+  <canvas id="final-canvas"></canvas>
+  <div style="position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; gap:1.6rem;">
+    <div id="final-typewriter"></div>
+    <button id="proposal-heart-btn" style="opacity:0;"><span id="proposal-heart">❤</span></button>
+    <div id="ring-animation"></div>
+    <div id="final-question">Will you continue writing this story with me forever?</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     ENDING
+     ============================================================ -->
+<section id="ending">
+  <canvas id="fireworks-canvas"></canvas>
+  <div class="section-inner reveal" style="position:relative; z-index:2;">
+    <div class="section-title hand" id="ending-line">I Love You Akansha ❤</div>
+    <div class="eyebrow" style="margin-top:1rem;">Forever</div>
+  </div>
+</section>
+
+<!-- ============================================================
+     TIME CAPSULE (hidden overlay, triggered after the site
+     appears to have ended — see CONFIG.timeCapsuleDelay)
+     ============================================================ -->
+<div id="time-capsule">
+  <div id="capsule-notice">One last thing... don't leave yet.</div>
+  <div id="capsule-letter"></div>
+</div>
+
+<!-- ============================================================
+     FLOATING MUSIC PLAYER
+     ============================================================ -->
+<div id="music-player" class="glass">
+  <button id="music-toggle">▶</button>
+  <div class="wave-bars"><span></span><span></span><span></span><span></span></div>
+  <audio id="bg-audio" loop preload="none">
+    <!-- Replace with your own romantic track -->
+    <source src="song.mp3" type="audio/mpeg">
+  </audio>
+</div>
+
+<script>
+/* ================================================================
+   CONFIG — everything you'll actually want to change lives here.
+   Swap photos, letters, reasons, timeline, quiz, and names in ONE
+   place. Nothing below this object needs to be touched to
+   customize the content of the site.
+================================================================= */
+const CONFIG = {
+  names: { her: "Akansha", him: "Tushar" },
+  startDate: "2026-05-23T23:50:00", // 23 May 2026, 11:50 PM
+  timeCapsuleDelay: 6000, // ms after reaching the ending before the capsule appears
+
+  openingLines: [
+    "Hey Beautiful ❤️",
+    "This isn't just a website...",
+    "It's every heartbeat I've ever had because of you."
+  ],
+
+  // Replace `img` with real photo URLs. `caption` shows on the polaroid.
+  
+  photos: [
+    { img: "photos/1.jpeg", caption: "........" },
+    { img: "photos/2.jpeg", caption: "........" },
+    { img: "photos/3.jpeg", caption: "My bby" },
+    { img: "photos/4.jpeg", caption: "My bacchaaa" },
+    { img: "photos/5.jpeg", caption: "My wifeyyyy" },
+    { img: "photos/6.jpeg", caption: "My kuchu puchu" },
+    { img: "photos/7.jpeg", caption: "My darling" },
+    { img: "photos/8.jpeg", caption: "........" },
+    { img: "photos/9.jpeg", caption: "......" }
+  ],
+
+  timeline: [
+    { icon:"❤️", title:"First Chat", text:"The message that started all of this." },
+    { icon:"🌸", title:"First Smile", text:"The exact moment I knew I was in trouble." },
+    { icon:"🥺", title:"First Fight", text:"We survived it. We survived all of them since." },
+    { icon:"🤍", title:"First Sorry", text:"The one that mattered more than being right." },
+    { icon:"🥰", title:"First Date", text:"Nervous, overdressed, completely worth it." },
+    { icon:"💍", title:"Future Together", text:"Still being written — by both of us." }
+  ],
+
+  // Add as many as you want — the counter below ("X of N discovered")
+  // always reflects however many are actually in this list, so it never
+  // repeats until every single one has been shown.
+  reasons: [
+    "The way you say my name when you're annoyed with me.",
+    "You remember things I mention once, in passing, months ago.",
+    "Your laugh has a way of making a bad day irrelevant.",
+    "You're stubborn about the right things.",
+    "You make ordinary days feel like they matter.",
+    "You say sorry first, even when you shouldn't have to.",
+    "The way you get excited about things that make you happy.",
+    "You've never once made me feel small.",
+    "You ask questions like you actually want to know the answer.",
+    "You're the calm I didn't know I needed.",
+    "You still get shy about things you shouldn't be shy about.",
+    "You worry about people who aren't even thinking about you.",
+    "You've never made me perform happiness for you — I just am.",
+    "Your handwriting. I don't know why. It just is.",
+    "You apologize with actions, not just words.",
+    "You make fun of me in a way that feels like affection.",
+    "You notice when I'm quiet for the wrong reasons.",
+    "You've never once used my past against me.",
+    "The way you get competitive over things that don't matter.",
+    "You keep every silly thing I've ever sent you.",
+    "You still get excited for plans we made a week ago.",
+    "You're kind to people who can't do anything for you.",
+    "You say what you mean, even when it's inconvenient.",
+    "You make me want to be a better version of myself, gently.",
+    "The way you fall asleep mid-sentence and deny it later.",
+    "You've never made my bad days feel like a burden to you.",
+    "You remember how I take my chai without asking.",
+    "You forgive faster than I think I deserve.",
+    "You still write to me like it's the first few weeks.",
+    "You make ordinary places feel like somewhere I want to be."
+  ],
+
+  letters: [
+    { title:"For an ordinary Tuesday", body:"Dear " + "{{her}}" + ",\n\nI don't need a reason to write this. I just wanted today to be the day you found out — again — that you're loved, deliberately, on purpose, without an occasion attached.\n\n— {{him}}" },
+    { title:"For when you doubt yourself", body:"Dear {{her}},\n\nWhen the noise in your head gets loud, borrow my volume of it for a second: you are enough, you were always enough, and nothing you're insecure about has ever once changed how I feel.\n\n— {{him}}" },
+    { title:"For no reason at all", body:"Dear {{her}},\n\nSome letters need a big moment behind them. This one doesn't. I just thought about you and wanted you to know it.\n\n— {{him}}" }
+  ],
+
+  hiddenMessages: [
+    "You found one of my hidden heartbeats ❤️",
+    "This one's been waiting here for you.",
+    "I hid this thinking of the day you'd find it.",
+    "A quiet little secret, just for you.",
+    "Every hidden star is a thing I don't say enough: I love you."
+  ],
+
+  quiz: [
+    { q:"Who's more stubborn?", options:["Me","You","Equally impossible"], correct:2 },
+    { q:"Who says sorry first?", options:["Me","You","Depends on the day"], correct:2 },
+    { q:"Who loves more?", options:["Me","You","There's no losing this one"], correct:2 }
+  ],
+
+  dreams: [
+    { icon:"🏡", title:"Dream House", text:"Somewhere loud with life and quiet when we need it." },
+    { icon:"✈️", title:"Travelling", text:"Every place on the list, slowly, together." },
+    { icon:"💍", title:"Marriage", text:"Making the unofficial, official." },
+    { icon:"👶", title:"Kids", text:"Someone to blame for how tired we'll be, and love anyway." },
+    { icon:"🌇", title:"Growing Old", text:"The whole point, really." }
+  ],
+
+  capsuleLetter: "Dear Akansha,\n\nIf you're reading this, thank you for making my world more beautiful than I ever imagined.\n\nHappy Girlfriend Day, my love. ❤️"
+};
+
+function fillNames(str){
+  return str.replaceAll("{{her}}", CONFIG.names.her).replaceAll("{{him}}", CONFIG.names.him);
+}
+</script>
+
+<!-- App script loaded next -->
+<script src="app.js"></script>
+</body>
+</html>
