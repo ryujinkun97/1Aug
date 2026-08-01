@@ -321,21 +321,32 @@ function initCounter(){
 function initGallery(){
   const track = qs('#gallery-track');
   const overlay = qs('#gallery-overlay');
+
+  let isDown = false, dragged = false, startX = 0, startScroll = 0;
+  track.addEventListener('mousedown', (e) => {
+    isDown = true; dragged = false;
+    startX = e.pageX; startScroll = track.scrollLeft;
+    track.style.cursor = 'grabbing';
+  });
+  window.addEventListener('mouseup', () => { isDown = false; track.style.cursor = ''; });
+  window.addEventListener('mousemove', (e) => {
+    if (!isDown) return;
+    const dx = e.pageX - startX;
+    if (Math.abs(dx) > 4) dragged = true;
+    track.scrollLeft = startScroll - dx;
+  });
+  track.style.cursor = 'grab';
+
   CONFIG.photos.forEach((p) => {
     const card = document.createElement('div');
     card.className = 'polaroid';
     card.innerHTML = `<div class="polaroid-img">${p.img ? '' : 'your photo here'}</div><div class="polaroid-cap">${p.caption}</div>`;
-    if (p.img) {
-    const img = card.querySelector(".polaroid-img");
-    img.style.backgroundImage = `url("${p.img}")`;
-    img.style.backgroundSize = "cover";
-    img.style.backgroundPosition = "center";
-    img.style.backgroundRepeat = "no-repeat";
-}
+    if (p.img) card.querySelector('.polaroid-img').style.backgroundImage = `url(${p.img})`;
     track.appendChild(card);
 
     if (!isTouch){
       card.addEventListener('mousemove', e => {
+        if (isDown) return;
         const r = card.getBoundingClientRect();
         const rx = ((e.clientY - r.top)/r.height - .5) * -14;
         const ry = ((e.clientX - r.left)/r.width - .5) * 14;
@@ -345,6 +356,7 @@ function initGallery(){
     }
 
     card.addEventListener('click', () => {
+      if (dragged) return;
       overlay.classList.add('show');
       card.classList.add('zoomed');
       for (let k=0;k<10;k++){
